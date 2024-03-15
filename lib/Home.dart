@@ -12,28 +12,29 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   List<Map<String, dynamic>> _listaTarefas = [];
-  TextEditingController _controllerTarefa = TextEditingController();
+  Map<String, dynamic> _ultimoRemovido = {};
+
+  final TextEditingController _controllerTarefa = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _lerArquivo(); // Chamar a função de leitura ao iniciar o widget
+    _lerArquivo();
   }
 
-  _getFile() async {
+  Future<File> _getFile() async {
     final diretorio = await getApplicationDocumentsDirectory();
     return File("${diretorio.path}/dados.json");
   }
 
-  _lerArquivo() async {
+  Future<void> _lerArquivo() async {
     try {
-      var arquivo = await _getFile();
+      final arquivo = await _getFile();
       if (await arquivo.exists()) {
-        String dados = await arquivo.readAsString();
+        final dados = await arquivo.readAsString();
         if (dados.isNotEmpty) {
-          List<dynamic> listaJson = json.decode(dados);
           setState(() {
-            _listaTarefas = listaJson.cast<Map<String, dynamic>>();
+            _listaTarefas = json.decode(dados).cast<Map<String, dynamic>>();
           });
         }
       }
@@ -42,60 +43,51 @@ class _HomeState extends State<Home> {
     }
   }
 
-  _salvarTarefa() async {
-    String textoDigitado = _controllerTarefa.text;
-
-    // Criar dados da nova tarefa
-    Map<String, dynamic> tarefa = {
-      'titulo': textoDigitado,
-      'realizada': false,
-    };
-
-    setState(() {
-      _listaTarefas.add(tarefa);
-    });
-
-    _salvarArquivo();
-    _controllerTarefa.text =
-        ""; // Chamar o método para salvar o arquivo após adicionar uma nova tarefa
-  }
-
-  _salvarArquivo() async {
+  Future<void> _salvarArquivo() async {
     try {
-      var arquivo = await _getFile();
-      String dados = json.encode(_listaTarefas); // Converter lista para JSON
-      await arquivo
-          .writeAsString(dados); // Escrever dados atualizados no arquivo
+      final arquivo = await _getFile();
+      final dados = json.encode(_listaTarefas);
+      await arquivo.writeAsString(dados);
     } catch (e) {
       print("Erro ao salvar arquivo: $e");
     }
   }
-  Widget criarItemLista(context, index){
-   return Dismissible(
+
+  void _salvarTarefa() {
+    final textoDigitado = _controllerTarefa.text.trim();
+    if (textoDigitado.isNotEmpty) {
+      final novaTarefa = {
+        'titulo': textoDigitado,
+        'realizada': false,
+      };
+      setState(() {
+        _listaTarefas.add(novaTarefa);
+      });
+      _salvarArquivo();
+      _controllerTarefa.clear();
+    }
+  }
+
+  Widget _criarItemLista(BuildContext context, int index) {
+    final tarefa = _listaTarefas[index];
+    return Dismissible(
+      key: Key(tarefa['titulo']),
       background: Container(
         color: Colors.green,
-        padding: EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.edit,
-              color: Colors.white,
-            )
-          ],
+        padding: const EdgeInsets.all(16),
+        alignment: Alignment.centerLeft,
+        child: const Icon(
+          Icons.edit,
+          color: Colors.white,
         ),
       ),
       secondaryBackground: Container(
         color: Colors.red,
-        padding: EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(
-              Icons.delete,
-              color: Colors.white,
-            )
-          ],
+        padding: const EdgeInsets.all(16),
+        alignment: Alignment.centerRight,
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
         ),
       ),
       direction: DismissDirection.horizontal,
@@ -106,23 +98,39 @@ class _HomeState extends State<Home> {
           print("direção startToEnd");
         }
         setState(() {
-          _listaTarefas.removeAt(index);
+          _ultimoRemovido = _listaTarefas.removeAt(index);
         });
+        _salvarArquivo();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.green,
+            content: const Text("Tarefa Excluída!!"),
+            action: SnackBarAction(
+              label: "Desfazer",
+              onPressed: () {
+                setState(() {
+                  _listaTarefas.insert(index, _ultimoRemovido);
+                });
+                _salvarArquivo();
+              },
+            ),
+          ),
+        );
       },
-      key: Key(_listaTarefas[index]['titulo']),
       child: CheckboxListTile(
-        title: Text(_listaTarefas[index]['titulo']),
-        value: _listaTarefas[index]['realizada'],
+        title: Text(tarefa['titulo']),
+        value: tarefa['realizada'],
         onChanged: (valorAlterado) {
           setState(() {
-            _listaTarefas[index]['realizada'] = valorAlterado;
-
+            tarefa['realizada'] = valorAlterado;
           });
           _salvarArquivo();
         },
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,30 +159,26 @@ class _HomeState extends State<Home> {
                   decoration: InputDecoration(labelText: "Digite sua tarefa"),
                 ),
                 actions: [
-                  FloatingActionButton(
-                      child: Text("Cancel"),
-                      onPressed: () => Navigator.pop(context)),
-                  FloatingActionButton(
-                      child: Text("Salva"),
-                      onPressed: () {
-                        _salvarTarefa();
-                        Navigator.pop(context);
-                      }),
+                  TextButton(
+                    child: Text("Cancelar"),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  TextButton(
+                    child: Text("Salvar"),
+                    onPressed: () {
+                      _salvarTarefa();
+                      Navigator.pop(context);
+                    },
+                  ),
                 ],
               );
             },
           );
         },
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _listaTarefas.length,
-              itemBuilder: criarItemLista,
-            ),
-          ),
-        ],
+      body: ListView.builder(
+        itemCount: _listaTarefas.length,
+        itemBuilder: _criarItemLista,
       ),
     );
   }
