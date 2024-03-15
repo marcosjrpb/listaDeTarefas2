@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:async';
 import 'dart:convert';
 
 class Home extends StatefulWidget {
@@ -13,6 +12,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   List<Map<String, dynamic>> _listaTarefas = [];
+  TextEditingController _controllerTarefa = TextEditingController();
 
   @override
   void initState() {
@@ -30,29 +30,38 @@ class _HomeState extends State<Home> {
       var arquivo = await _getFile();
       if (await arquivo.exists()) {
         String dados = await arquivo.readAsString();
-        List<dynamic> listaJson = json.decode(dados);
-        setState(() {
-          _listaTarefas = listaJson.cast<Map<String, dynamic>>();
-        });
+        if (dados.isNotEmpty) {
+          List<dynamic> listaJson = json.decode(dados);
+          setState(() {
+            _listaTarefas = listaJson.cast<Map<String, dynamic>>();
+          });
+        }
       }
     } catch (e) {
       print("Erro ao ler arquivo: $e");
     }
   }
 
+  _salvarTarefa() async {
+    String textoDigitado = _controllerTarefa.text;
+
+    // Criar dados da nova tarefa
+    Map<String, dynamic> tarefa = {
+      'titulo': textoDigitado,
+      'realizada': false,
+    };
+
+    setState(() {
+      _listaTarefas.add(tarefa);
+    });
+
+    _salvarArquivo();
+    _controllerTarefa.text = "";// Chamar o método para salvar o arquivo após adicionar uma nova tarefa
+  }
+
   _salvarArquivo() async {
     try {
-      await _lerArquivo(); // Ler dados do arquivo antes de adicionar nova tarefa
       var arquivo = await _getFile();
-
-      // Criar dados da nova tarefa
-      Map<String, dynamic> tarefa = {
-        'titulo': "Ir ao Shopping",
-        'realizada': false,
-      };
-
-      _listaTarefas.add(tarefa); // Adicionar nova tarefa à lista
-
       String dados = json.encode(_listaTarefas); // Converter lista para JSON
       await arquivo.writeAsString(dados); // Escrever dados atualizados no arquivo
     } catch (e) {
@@ -62,7 +71,6 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    _salvarArquivo();
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -85,6 +93,7 @@ class _HomeState extends State<Home> {
               return AlertDialog(
                 title: Text("Adicionar Tarefa"),
                 content: TextField(
+                  controller: _controllerTarefa,
                   decoration: InputDecoration(labelText: "Digite sua tarefa"),
                 ),
                 actions: [
@@ -94,7 +103,8 @@ class _HomeState extends State<Home> {
                   FloatingActionButton(
                       child: Text("Salva"),
                       onPressed: () {
-                        // Adicionar aqui a lógica para salvar a nova tarefa
+                        _salvarTarefa();
+                        Navigator.pop(context);
                       }),
                 ],
               );
@@ -106,18 +116,25 @@ class _HomeState extends State<Home> {
         children: [
           Expanded(
             child: ListView.builder(
-              itemCount: _listaTarefas.length > 10 ? 10 : _listaTarefas.length,
+              itemCount: _listaTarefas.length,
               itemBuilder: (context, index) {
-                return ListTile(
+                return CheckboxListTile(
                   title: Text(_listaTarefas[index]['titulo']),
+                  value: _listaTarefas[index]['realizada'],
+                  onChanged: (valorAlterado) {
+                    setState(() {
+                      _listaTarefas[index]['realizada'] = valorAlterado;
+
+                    });
+                    _salvarArquivo();
+                  },
                 );
               },
             ),
+
           ),
         ],
       ),
     );
   }
 }
-
-
