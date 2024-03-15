@@ -56,19 +56,73 @@ class _HomeState extends State<Home> {
     });
 
     _salvarArquivo();
-    _controllerTarefa.text = "";// Chamar o método para salvar o arquivo após adicionar uma nova tarefa
+    _controllerTarefa.text =
+        ""; // Chamar o método para salvar o arquivo após adicionar uma nova tarefa
   }
 
   _salvarArquivo() async {
     try {
       var arquivo = await _getFile();
       String dados = json.encode(_listaTarefas); // Converter lista para JSON
-      await arquivo.writeAsString(dados); // Escrever dados atualizados no arquivo
+      await arquivo
+          .writeAsString(dados); // Escrever dados atualizados no arquivo
     } catch (e) {
       print("Erro ao salvar arquivo: $e");
     }
   }
+  Widget criarItemLista(context, index){
+   return Dismissible(
+      background: Container(
+        color: Colors.green,
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.edit,
+              color: Colors.white,
+            )
+          ],
+        ),
+      ),
+      secondaryBackground: Container(
+        color: Colors.red,
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(
+              Icons.delete,
+              color: Colors.white,
+            )
+          ],
+        ),
+      ),
+      direction: DismissDirection.horizontal,
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          print("direção endStart");
+        } else if (direction == DismissDirection.startToEnd) {
+          print("direção startToEnd");
+        }
+        setState(() {
+          _listaTarefas.removeAt(index);
+        });
+      },
+      key: Key(_listaTarefas[index]['titulo']),
+      child: CheckboxListTile(
+        title: Text(_listaTarefas[index]['titulo']),
+        value: _listaTarefas[index]['realizada'],
+        onChanged: (valorAlterado) {
+          setState(() {
+            _listaTarefas[index]['realizada'] = valorAlterado;
 
+          });
+          _salvarArquivo();
+        },
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,64 +171,8 @@ class _HomeState extends State<Home> {
           Expanded(
             child: ListView.builder(
               itemCount: _listaTarefas.length,
-              itemBuilder: (context, index) {
-                return Dismissible(
-                  background: Container(
-                    color: Colors.green,
-                    padding: EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Icon(
-                        Icons.edit,
-                          color: Colors.white,
-                    )
-                      ],
-                    ),
-                  ),
-                  secondaryBackground: Container(
-                    color: Colors.red,
-                    padding: EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(
-                         Icons.delete,
-                         color: Colors.white,
-                        )
-                      ],
-                    ),
-
-                  ),
-                  direction: DismissDirection.horizontal,
-                  onDismissed: (direction){
-
-                    if(direction == DismissDirection.endToStart){
-                      print("direção endStart");
-                    }else if(direction == DismissDirection.startToEnd){
-                      print("direção startToEnd");
-                    }
-                    setState(() {
-                         _listaTarefas.removeAt(index);
-                    });
-
-                  },
-                  key: Key(_listaTarefas[index]['titulo']),
-                    child:  CheckboxListTile(
-                      title: Text(_listaTarefas[index]['titulo']),
-                      value: _listaTarefas[index]['realizada'],
-                      onChanged: (valorAlterado) {
-                        setState(() {
-                          _listaTarefas[index]['realizada'] = valorAlterado;
-
-                        });
-                        _salvarArquivo();
-                      },
-                    ),
-                );
-              },
+              itemBuilder: criarItemLista,
             ),
-
           ),
         ],
       ),
